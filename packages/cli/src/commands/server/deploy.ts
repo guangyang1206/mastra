@@ -100,7 +100,8 @@ async function readEnvVars(projectDir: string): Promise<Record<string, string>> 
 /*  Resolve org                                                       */
 /* ------------------------------------------------------------------ */
 
-async function resolveOrg(
+/** @internal – exported for testing only */
+export async function resolveOrg(
   token: string,
   projectConfig: { organizationId?: string } | null,
   flagOrg?: string,
