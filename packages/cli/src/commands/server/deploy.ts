@@ -117,6 +117,9 @@ async function resolveOrg(
   }
 
   if (projectConfig?.organizationId) {
+    if (process.env.MASTRA_API_TOKEN) {
+      return { orgId: projectConfig.organizationId, orgName: projectConfig.organizationId };
+    }
     const orgs = await fetchOrgs(token);
     const match = orgs.find(o => o.id === projectConfig.organizationId);
     if (match) {
