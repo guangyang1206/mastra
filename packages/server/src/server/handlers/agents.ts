@@ -55,13 +55,7 @@ import type { Context } from '../types';
 import { toSlug } from '../utils';
 
 import { handleError } from './error';
-import {
-  sanitizeBody,
-  validateBody,
-  getEffectiveResourceId,
-  getEffectiveThreadId,
-  validateThreadOwnership,
-} from './utils';
+import { sanitizeBody, validateBody, getEffectiveResourceId, getEffectiveThreadId, enforceThreadAccess } from './utils';
 
 /**
  * Merge incoming version overrides onto a RequestContext.
@@ -935,6 +929,20 @@ export const LIST_AGENTS_ROUTE = createRoute({
         logger.debug('Could not fetch stored agents', { error: storageError });
       }
 
+      // Filter agents by FGA if configured
+      const fgaProvider = mastra.getServer?.()?.fga;
+      const user = requestContext?.get('user');
+      if (fgaProvider && user) {
+        const agentList = Object.values(serializedAgents) as unknown as Array<{ id: string }>;
+        const accessible = await fgaProvider.filterAccessible(user, agentList, 'agent', 'agents:read');
+        const accessibleSet = new Set(accessible.map(a => a.id));
+        for (const id of Object.keys(serializedAgents)) {
+          if (!accessibleSet.has(id)) {
+            delete serializedAgents[id];
+          }
+        }
+      }
+
       return serializedAgents;
     } catch (error) {
       return handleError(error, 'Error getting agents');
@@ -955,6 +963,7 @@ export const GET_AGENT_BY_ID_ROUTE = createRoute({
   tags: ['Agents'],
   requiresAuth: true,
   requiresPermission: 'agents:read',
+  fga: { resourceType: 'agent', resourceIdParam: 'agentId', permission: 'agents:read' },
   handler: async ({ agentId, mastra, requestContext, status, versionId }) => {
     try {
       const versionOptions = versionId ? { versionId } : status ? { status } : undefined;
@@ -1073,11 +1082,20 @@ export const GENERATE_AGENT_ROUTE = createRoute({
         const effectiveThreadId = getEffectiveThreadId(serverRequestContext, clientThreadId);
 
         // Validate thread ownership if accessing an existing thread
-        if (effectiveThreadId && effectiveResourceId) {
+        if (effectiveThreadId) {
           const memoryInstance = await agent.getMemory({ requestContext: serverRequestContext });
           if (memoryInstance) {
             const thread = await memoryInstance.getThreadById({ threadId: effectiveThreadId });
-            await validateThreadOwnership(thread, effectiveResourceId);
+            if (thread) {
+              await enforceThreadAccess({
+                mastra,
+                requestContext: serverRequestContext,
+                threadId: effectiveThreadId,
+                thread,
+                effectiveResourceId,
+                permission: 'memory:write',
+              });
+            }
           }
         }
 
@@ -1148,11 +1166,20 @@ export const GENERATE_LEGACY_ROUTE = createRoute({
       }
 
       // Validate thread ownership if accessing an existing thread
-      if (effectiveThreadId && effectiveResourceId) {
+      if (effectiveThreadId) {
         const memory = await agent.getMemory({ requestContext });
         if (memory) {
           const thread = await memory.getThreadById({ threadId: effectiveThreadId });
-          await validateThreadOwnership(thread, effectiveResourceId);
+          if (thread) {
+            await enforceThreadAccess({
+              mastra,
+              requestContext,
+              threadId: effectiveThreadId,
+              thread,
+              effectiveResourceId,
+              permission: 'memory:write',
+            });
+          }
         }
       }
 
@@ -1208,11 +1235,20 @@ export const STREAM_GENERATE_LEGACY_ROUTE = createRoute({
       }
 
       // Validate thread ownership if accessing an existing thread
-      if (effectiveThreadId && effectiveResourceId) {
+      if (effectiveThreadId) {
         const memory = await agent.getMemory({ requestContext });
         if (memory) {
           const thread = await memory.getThreadById({ threadId: effectiveThreadId });
-          await validateThreadOwnership(thread, effectiveResourceId);
+          if (thread) {
+            await enforceThreadAccess({
+              mastra,
+              requestContext,
+              threadId: effectiveThreadId,
+              thread,
+              effectiveResourceId,
+              permission: 'memory:write',
+            });
+          }
         }
       }
 
@@ -1368,11 +1404,20 @@ export const STREAM_GENERATE_ROUTE = createRoute({
         const effectiveThreadId = getEffectiveThreadId(serverRequestContext, clientThreadId);
 
         // Validate thread ownership if accessing an existing thread
-        if (effectiveThreadId && effectiveResourceId) {
+        if (effectiveThreadId) {
           const memoryInstance = await agent.getMemory({ requestContext: serverRequestContext });
           if (memoryInstance) {
             const thread = await memoryInstance.getThreadById({ threadId: effectiveThreadId });
-            await validateThreadOwnership(thread, effectiveResourceId);
+            if (thread) {
+              await enforceThreadAccess({
+                mastra,
+                requestContext: serverRequestContext,
+                threadId: effectiveThreadId,
+                thread,
+                effectiveResourceId,
+                permission: 'memory:write',
+              });
+            }
           }
         }
 
