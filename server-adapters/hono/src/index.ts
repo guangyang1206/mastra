@@ -621,7 +621,9 @@ export class MastraServer extends MastraServerBase<HonoApp, HonoRequest, Context
 
       const allHandlers = [...middlewares, handler];
       const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch' | 'all';
-      this.app[method](route.path, allHandlers[0]!, ...allHandlers.slice(1));
+      const prefix = this.prefix ?? '';
+      const fullPath = `${prefix}${route.path}`;
+      this.app[method](fullPath, allHandlers[0]!, ...allHandlers.slice(1));
     }
   }
 
