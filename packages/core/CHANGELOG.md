@@ -1,5 +1,13 @@
 # @mastra/core
 
+## 1.29.0-alpha.2
+
+### Patch Changes
+
+- Fixed resourceId not being forwarded to createRun() in the agentic loop, which caused persistWorkflowSnapshot to receive resourceId: undefined. ([#15742](https://github.com/mastra-ai/mastra/pull/15742))
+
+- Fixed the TypeScript type for `requireApproval` on tools so it accepts a function in addition to a boolean. The runtime already supported per-call approval functions (added in #15346), but the type still required `boolean`, forcing an `as any` cast. You can now pass a sync or async predicate without a cast — the predicate receives the validated tool input and an optional `{ requestContext, workspace }` second argument. Fixes #15647. ([#15783](https://github.com/mastra-ai/mastra/pull/15783))
+
 ## 1.29.0-alpha.1
 
 ### Patch Changes
