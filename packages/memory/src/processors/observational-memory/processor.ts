@@ -140,8 +140,24 @@ export class ObservationalMemoryProcessor implements Processor<'observational-me
         ? (safeCaptureJson(messageList.serialize()) as ReturnType<MessageList['serialize']>)
         : null;
 
-      // ── Read-only fast path: skip turn creation and observation lifecycle ──
+      // ── Read-only fast path: load context but skip turn creation and observation lifecycle ──
+      // We must still call memory.getContext() so that stored history/observations are loaded
+      // into the MessageList. Only write-side effects (observation, reflection, persistence)
+      // are skipped. Without this load, read-only mode silently drops all prior context.
       if (readOnly) {
+        if (stepNumber === 0) {
+          const ctx = await this.memory.getContext({ threadId, resourceId });
+          for (const msg of ctx.messages) {
+            if (msg.role !== 'system') {
+              messageList.add(msg, 'memory');
+            }
+          }
+          if (ctx.systemMessage) {
+            messageList.clearSystemMessages('observational-memory');
+            messageList.addSystem(ctx.systemMessage, 'observational-memory');
+          }
+          omDebug(`[OM:processInputStep:READ-ONLY] loaded ${ctx.messages.length} historical messages for thread=${threadId}`);
+        }
         return messageList;
       }
 
