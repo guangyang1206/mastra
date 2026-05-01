@@ -304,6 +304,7 @@ export class AIV6Adapter {
         content: compatibleContent as unknown as AIV5Type.ModelMessage['content'],
       } as AIV5Type.ModelMessage,
       _messageSource,
+      context.dbMessages,
     );
 
     const parts = [...baseDb.content.parts];

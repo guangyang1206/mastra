@@ -634,7 +634,11 @@ export class AIV5Adapter {
   /**
    * Direct conversion from AIV5 ModelMessage to MastraDBMessage
    */
-  static fromModelMessage(modelMsg: AIV5Type.ModelMessage, _messageSource?: MessageSource): MastraDBMessage {
+  static fromModelMessage(
+    modelMsg: AIV5Type.ModelMessage,
+    _messageSource?: MessageSource,
+    priorMessages?: MastraDBMessage[],
+  ): MastraDBMessage {
     const content = Array.isArray(modelMsg.content)
       ? modelMsg.content
       : [{ type: 'text', text: modelMsg.content } satisfies AIV5.TextPart];
@@ -681,6 +685,31 @@ export class AIV5Adapter {
         const toolResultPart = part;
         const matchingCall = toolInvocations.find(inv => inv.toolCallId === toolResultPart.toolCallId);
 
+        // Look up args from prior stored messages when the matching tool-call is not in the
+        // current model message (common in resumeStream where tool-results arrive alone).
+        const lookupPriorArgs = (toolCallId: string): unknown => {
+          if (!priorMessages) return {};
+          for (const msg of priorMessages) {
+            const parts = msg.content?.parts;
+            if (!Array.isArray(parts)) continue;
+            for (const p of parts as any[]) {
+              if (
+                p.type === 'tool-invocation' &&
+                p.toolInvocation?.toolCallId === toolCallId &&
+                p.toolInvocation?.args !== undefined
+              ) {
+                return p.toolInvocation.args;
+              }
+            }
+            const invocations = msg.content?.toolInvocations;
+            if (Array.isArray(invocations)) {
+              const found = (invocations as any[]).find(i => i.toolCallId === toolCallId);
+              if (found?.args !== undefined) return found.args;
+            }
+          }
+          return {};
+        };
+
         const matchingV2Part = mastraDBParts.find(
           (p): p is Extract<MastraDBMessage['content']['parts'][number], { type: 'tool-invocation' }> =>
             p.type === 'tool-invocation' &&
@@ -703,7 +732,7 @@ export class AIV5Adapter {
             state: 'call',
             toolCallId: toolResultPart.toolCallId,
             toolName: sanitizeToolName(toolResultPart.toolName),
-            args: {},
+            args: lookupPriorArgs(toolResultPart.toolCallId),
           };
           updateMatchingCallInvocationResult(toolResultPart, call);
           toolInvocations.push(call);
@@ -721,7 +750,7 @@ export class AIV5Adapter {
             toolInvocation: {
               toolCallId: toolResultPart.toolCallId,
               toolName: sanitizeToolName(toolResultPart.toolName),
-              args: {},
+              args: lookupPriorArgs(toolResultPart.toolCallId),
               state: 'call',
             },
           };
