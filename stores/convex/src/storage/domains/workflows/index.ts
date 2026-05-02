@@ -1,3 +1,4 @@
+SHA: 7e9bf3d30e253ef8cede6e163b4656f92a607308
 import { TABLE_WORKFLOW_SNAPSHOT, normalizePerPage, WorkflowsStorage } from '@mastra/core/storage';
 import type {
   StorageListWorkflowRunsInput,
@@ -81,13 +82,19 @@ export class WorkflowsConvex extends WorkflowsStorage {
       keys: { workflow_name: workflowName, run_id: runId },
     });
 
+    // Convex rejects document fields whose names start with "$" (reserved prefix).
+    // Workflow snapshots can contain $-prefixed keys (e.g. $schema from serialized
+    // Zod JSON Schemas inside tool-call results). Stringify the snapshot so it is
+    // stored as a plain string; loadWorkflowSnapshot already handles both forms.
+    const serializedSnapshot = JSON.stringify(snapshot);
+
     await this.#db.insert({
       tableName: TABLE_WORKFLOW_SNAPSHOT,
       record: {
         workflow_name: workflowName,
         run_id: runId,
         resourceId,
-        snapshot,
+        snapshot: serializedSnapshot,
         createdAt: existing?.createdAt ?? (createdAt ? new Date(createdAt).toISOString() : now.toISOString()),
         updatedAt: updatedAt ? new Date(updatedAt).toISOString() : now.toISOString(),
       },
