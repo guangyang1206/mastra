@@ -112,7 +112,7 @@ function unwrapOptionalNullable(schema: z.ZodTypeAny): z.ZodTypeAny {
   return inner;
 }
 
-function parseComplexQueryParams(
+export function parseComplexQueryParams(
   queryParamSchema: z.ZodTypeAny,
   params: Record<string, QueryParamValue>,
 ): Record<string, QueryParamValue | unknown> {

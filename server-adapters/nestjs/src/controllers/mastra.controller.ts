@@ -79,8 +79,12 @@ export class MastraController {
   }
 
   /**
-   * Parse and normalize query parameters.
-   * Handles type coercion for numbers, booleans, arrays, and JSON strings.
+   * Normalize query parameters, stripping prototype-pollution keys and the
+   * internal `requestContext` key. Values are returned as raw strings so that
+   * schema-guided coercion in `route-handler.service.ts` can decide the
+   * correct target type instead of blindly coercing every string before
+   * validation. This matches Express/Hono/Koa/Fastify adapter behaviour.
+   * See: https://github.com/mastra-ai/mastra/issues/16114
    */
   private parseQueryParams(query: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
@@ -96,68 +100,10 @@ export class MastraController {
         continue;
       }
 
-      result[key] = this.coerceQueryValue(value);
+      result[key] = value;
     }
 
     return result;
-  }
-
-  /**
-   * Coerce a query parameter value to its appropriate type.
-   *
-   * Type coercion rules:
-   * - "true"/"false" → boolean
-   * - "null" → null
-   * - Numeric strings → number (except IDs with leading zeros like "007")
-   * - JSON objects/arrays → parsed object/array
-   *
-   * @example
-   * // Numbers
-   * coerceQueryValue("42")      // → 42
-   * coerceQueryValue("3.14")    // → 3.14
-   * coerceQueryValue("007")     // → "007" (preserved as string)
-   *
-   * // Booleans
-   * coerceQueryValue("true")    // → true
-   * coerceQueryValue("false")   // → false
-   *
-   * // JSON
-   * coerceQueryValue('{"a":1}') // → { a: 1 }
-   */
-  private coerceQueryValue(value: unknown): unknown {
-    // Handle arrays
-    if (Array.isArray(value)) {
-      return value.map(v => this.coerceQueryValue(v));
-    }
-
-    // Handle strings
-    if (typeof value === 'string') {
-      // Boolean coercion
-      if (value === 'true') return true;
-      if (value === 'false') return false;
-
-      // Null coercion
-      if (value === 'null') return null;
-
-      // Number coercion (only if the entire string is a valid number)
-      if (value !== '' && !isNaN(Number(value)) && isFinite(Number(value))) {
-        // Don't coerce strings that look like phone numbers or IDs with leading zeros
-        if (!value.startsWith('0') || value === '0' || value.includes('.')) {
-          return Number(value);
-        }
-      }
-
-      // JSON object/array coercion
-      if ((value.startsWith('{') && value.endsWith('}')) || (value.startsWith('[') && value.endsWith(']'))) {
-        try {
-          return JSON.parse(value);
-        } catch {
-          // Not valid JSON, use as string
-        }
-      }
-    }
-
-    return value;
   }
 
   /**

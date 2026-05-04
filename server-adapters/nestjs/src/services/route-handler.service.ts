@@ -1,7 +1,7 @@
 import type { Mastra } from '@mastra/core/mastra';
 import type { RequestContext } from '@mastra/core/request-context';
-import { SERVER_ROUTES } from '@mastra/server/server-adapter';
-import type { ServerRoute, ServerContext } from '@mastra/server/server-adapter';
+import { SERVER_ROUTES, parseComplexQueryParams } from '@mastra/server/server-adapter';
+import type { ServerRoute, ServerContext, QueryParamValue } from '@mastra/server/server-adapter';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ZodError } from 'zod';
 
@@ -189,7 +189,13 @@ export class RouteHandlerService {
     let validatedQueryParams = params.queryParams;
     if (route.queryParamSchema) {
       try {
-        validatedQueryParams = (await route.queryParamSchema.parseAsync(params.queryParams)) as Record<string, unknown>;
+        // Apply schema-guided JSON parsing for complex query params (objects/arrays).
+        // This matches Express/Hono/Koa behaviour: only JSON-parse a query value when
+        // the corresponding schema shape expects a non-primitive type, leaving all
+        // other values as raw strings so that z.string() fields are not broken by
+        // blind coercion. (Fixes #16114)
+        const parsedQueryParams = parseComplexQueryParams(route.queryParamSchema, params.queryParams as Record<string, QueryParamValue>);
+        validatedQueryParams = (await route.queryParamSchema.parseAsync(parsedQueryParams)) as Record<string, unknown>;
       } catch (error) {
         if (isZodErrorLike(error)) {
           throw new ValidationError('Invalid query parameters', error);
