@@ -2560,6 +2560,40 @@ export class Harness<TState = {}> {
     return await this.processStream(response, requestContext);
   }
 
+  /**
+   * Poll the workflow storage until the run snapshot is durably marked as
+   * `suspended` or `waiting`.  This prevents a race condition where the
+   * caller (e.g. a custom harness route) resumes immediately after the
+   * `tool-call-suspended` chunk arrives — before the workflow engine has had
+   * a chance to flush the snapshot to the store.  Without this guard,
+   * `resumeStream` cannot find the tool call in the persisted message list and
+   * silently drops the result, breaking everything downstream.
+   *
+   * The poll is skipped when no storage is available (in-memory / SQLite
+   * instant writes), keeping the fast path unchanged.
+   *
+   * See #16158.
+   */
+  private async waitForSuspendedSnapshot(
+    runId: string,
+    opts: { intervalMs?: number; timeoutMs?: number } = {},
+  ): Promise<void> {
+    const storage = this.#internalMastra?.getStorage();
+    if (!storage) return; // no storage → in-memory, no race
+
+    const intervalMs = opts.intervalMs ?? 100;
+    const timeoutMs = opts.timeoutMs ?? 5_000;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const run = await storage.workflows.getWorkflowRunById({ runId }).catch(() => null);
+      const status = run?.status;
+      if (status === 'suspended' || status === 'waiting') return;
+      await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
+    }
+    // Timed out — proceed anyway; resumeStream has its own error handling.
+  }
+
   private async handleToolResume({
     resumeData,
     requestContext: requestContextInput,
@@ -2576,6 +2610,12 @@ export class Harness<TState = {}> {
     if (!this.abortController) {
       this.abortController = new AbortController();
     }
+
+    // Wait for the workflow engine to persist the suspended snapshot before
+    // calling resumeStream.  Without this, fast clients can race ahead and
+    // resumeStream finds no matching tool call in the store, causing the
+    // updateToolInvocation warning and the dropped result (see #16158).
+    await this.waitForSuspendedSnapshot(this.pendingSuspensionRunId);
 
     const requestContext = await this.buildRequestContext(requestContextInput);
     const isYolo = (this.state as Record<string, unknown>).yolo === true;
