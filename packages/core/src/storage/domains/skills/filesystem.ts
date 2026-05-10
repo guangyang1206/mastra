@@ -128,11 +128,37 @@ export class FilesystemSkillsStorage extends SkillsStorage {
         ...configFields,
       };
 
+      // Deep equality comparison (order-insensitive for objects)
+      const deepEqual = (a: unknown, b: unknown): boolean => {
+        if (a === b) return true;
+        if (a === null || b === null) return false;
+        if (typeof a !== typeof b) return false;
+        
+        if (Array.isArray(a) && Array.isArray(b)) {
+          if (a.length !== b.length) return false;
+          return a.every((val, idx) => deepEqual(val, b[idx]));
+        }
+        
+        if (typeof a === 'object' && typeof b === 'object') {
+          const aObj = a as Record<string, unknown>;
+          const bObj = b as Record<string, unknown>;
+          const aKeys = Object.keys(aObj).sort();
+          const bKeys = Object.keys(bObj).sort();
+          if (aKeys.length !== bKeys.length) return false;
+          if (!aKeys.every((key, idx) => key === bKeys[idx])) return false;
+          return aKeys.every(key => deepEqual(aObj[key], bObj[key]));
+        }
+        
+        return false;
+      };
+      
       const changedFields = configFieldNames.filter(
         field =>
           field in configFields &&
-          JSON.stringify(configFields[field as keyof typeof configFields]) !==
-            JSON.stringify(latestConfig[field as keyof typeof latestConfig]),
+          !deepEqual(
+            configFields[field as keyof typeof configFields],
+            latestConfig[field as keyof typeof latestConfig],
+          ),
       );
 
       if (changedFields.length > 0) {
