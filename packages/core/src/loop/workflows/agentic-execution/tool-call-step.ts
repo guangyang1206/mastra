@@ -148,7 +148,7 @@ export function createToolCallStep<Tools extends ToolSet = ToolSet, OUTPUT = und
               ? (lastAssistantMessage.content.metadata as Record<string, any>)
               : {};
           metadata[metadataKey] = metadata[metadataKey] || {};
-          // Note: We key by toolName rather than toolCallId to track one suspension state per unique tool.
+          // Use toolCallId as key to support multiple parallel suspends of the same tool
           const inputTransform = getTransformedToolPayload(
             toolStateTransformMetadata,
             'transcript',
@@ -169,7 +169,7 @@ export function createToolCallStep<Tools extends ToolSet = ToolSet, OUTPUT = und
               ? (approvalTransform ?? inputTransform ?? args)
               : (inputTransform ?? suspendTransform ?? args);
           const transformedSuspendPayload = type === 'suspension' ? (suspendTransform ?? suspendPayload) : undefined;
-          metadata[metadataKey][toolName] = {
+          metadata[metadataKey][toolCallId] = {
             toolCallId,
             toolName,
             args: transformedArgs,
@@ -183,7 +183,7 @@ export function createToolCallStep<Tools extends ToolSet = ToolSet, OUTPUT = und
         }
       };
 
-      const removeToolMetadata = async (toolName: string, type: 'suspension' | 'approval') => {
+      const removeToolMetadata = async (toolName: string, type: 'suspension' | 'approval', toolCallId?: string) => {
         const { saveQueueManager, memoryConfig, threadId } = _internal || {};
 
         if (!saveQueueManager || !threadId) {
