@@ -661,6 +661,15 @@ export class Memory extends MastraMemory {
     if (this.vector) {
       void this.deleteThreadVectors(threadId);
     }
+    // Clear observational memory for this thread (issue #16628)
+    try {
+      const thread = await this.getThreadById({ threadId });
+      const resourceId = thread?.resourceId;
+      // clearObservationalMemory signature: (threadId | null, resourceId)
+      await memoryStore.clearObservationalMemory(threadId, resourceId || '');
+    } catch (e) {
+      this.logger.debug('Failed to clear observational memory for thread', { threadId, error: e });
+    }
   }
 
   /**
