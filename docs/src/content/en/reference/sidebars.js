@@ -42,6 +42,7 @@ const sidebars = {
         { type: 'doc', id: 'agents/listTools', label: '.listTools()' },
         { type: 'doc', id: 'agents/listWorkflows', label: '.listWorkflows()' },
         { type: 'doc', id: 'agents/network', label: '.network()' },
+        { type: 'doc', id: 'agents/response-caching', label: 'Response caching' },
       ],
     },
     {
