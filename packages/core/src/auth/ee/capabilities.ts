@@ -206,8 +206,8 @@ export async function buildCapabilities(
   // Build login configuration (always public)
   let login: PublicAuthCapabilities['login'] = null;
 
-  const hasSSO = implementsInterface<ISSOProvider>(auth, 'getLoginUrl') && isLicensedOrCloud;
-  const hasCredentials = implementsInterface<ICredentialsProvider>(auth, 'signIn') && isLicensedOrCloud;
+  const hasSSO = implementsInterface<ISSOProvider>(auth, 'getLoginUrl');
+  const hasCredentials = implementsInterface<ICredentialsProvider>(auth, 'signIn');
 
   // Build SSO login URL using the configured prefix (default: /api)
   const raw = (options?.apiPrefix || '/api').trim();
@@ -255,7 +255,7 @@ export async function buildCapabilities(
 
   // Try to get current user (requires session)
   let user: EEUser | null = null;
-  if (implementsInterface<IUserProvider>(auth, 'getCurrentUser') && isLicensedOrCloud) {
+  if (implementsInterface<IUserProvider>(auth, 'getCurrentUser')) {
     try {
       user = await auth.getCurrentUser(request);
     } catch {
@@ -278,9 +278,9 @@ export async function buildCapabilities(
 
   // Build capability flags
   const capabilities: CapabilityFlags = {
-    user: implementsInterface<IUserProvider>(auth, 'getCurrentUser') && isLicensedOrCloud,
-    session: implementsInterface<ISessionProvider>(auth, 'createSession') && isLicensedOrCloud,
-    sso: implementsInterface<ISSOProvider>(auth, 'getLoginUrl') && isLicensedOrCloud,
+    user: implementsInterface<IUserProvider>(auth, 'getCurrentUser'),
+    session: implementsInterface<ISessionProvider>(auth, 'createSession'),
+    sso: implementsInterface<ISSOProvider>(auth, 'getLoginUrl'),
     rbac: hasRBAC,
     acl: implementsInterface<IACLProvider>(auth, 'canAccess') && isLicensedOrCloud,
     fga: hasFGA,
