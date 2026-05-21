@@ -1583,24 +1583,27 @@ export class MessageList {
           ? new Date(start)
           : undefined;
 
-    if (startDate && !this.lastCreatedAt) {
-      this.lastCreatedAt = startDate.getTime();
-      return startDate;
-    }
-
+    // Memory replay: preserve the original timestamp so the replayed conversation
+    // doesn't get re-ordered.  This is the ONLY case where we honour `startDate`.
     if (startDate && messageSource === `memory`) {
-      // Preserve user-provided timestamps for memory messages to avoid re-ordering
-      // Messages without timestamps will fall through to get generated incrementing timestamps
+      // Only set lastCreatedAt if it hasn't been set yet (first memory message)
+      if (!this.lastCreatedAt) {
+        this.lastCreatedAt = startDate.getTime();
+      }
       return startDate;
     }
 
+    // For ALL non-memory sources (input, tool-result, agent-response, etc.) use
+    // wall-clock time.  Using `startDate` here caused #16893: the step's
+    // `createdAt` is its *creation* time, which for long conversations can be
+    // older than the inflated timestamps that `MessageList` assigns to input
+    // messages.  The response then sorts into the middle of the history.
     const now = new Date();
-    const nowTime = startDate?.getTime() || now.getTime();
-    // find the latest createdAt in stored messages and parts
+    const nowTime = now.getTime();
     const lastTime = this.lastCreatedAt || 0;
 
-    // make sure our new message is created later than the latest known message time
-    // it's expected that messages are added to the list in order if they don't have a createdAt date on them
+    // Make sure our new message is created later than the latest known message time.
+    // `+1 ms` is intentional — we only need strict ordering, not a real timestamp.
     if (nowTime <= lastTime) {
       const newDate = new Date(lastTime + 1);
       this.lastCreatedAt = newDate.getTime();
