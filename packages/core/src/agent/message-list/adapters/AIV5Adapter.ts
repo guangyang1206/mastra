@@ -1,4 +1,4 @@
-import type { ToolInvocationUIPart } from '@ai-sdk/ui-utils-v5';
+import type { ToolInvocationUIPart } from '../../../_types/ai-sdk.types.d.ts';
 import * as AIV5 from '@internal/ai-sdk-v5';
 
 import { MastraError, ErrorDomain, ErrorCategory } from '../../../error';

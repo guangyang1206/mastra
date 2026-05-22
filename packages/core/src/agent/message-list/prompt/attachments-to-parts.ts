@@ -1,4 +1,4 @@
-import type { Attachment } from '@ai-sdk/ui-utils-v5';
+import type { Attachment } from '../../../_types/ai-sdk.types.d.ts';
 import type { FilePart, ImagePart, TextPart } from '@internal/ai-sdk-v4';
 import { categorizeFileData, createDataUri } from './image-utils';
 
