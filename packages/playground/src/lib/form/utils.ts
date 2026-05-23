@@ -2,6 +2,7 @@ import type { FieldConfig } from '@autoform/core';
 import { buildZodFieldConfig } from '@autoform/react';
 import { z } from 'zod';
 import type { FieldTypes } from './auto-form';
+import { convertSchemaToZod } from '@mastra/schema-compat/utils';
 
 // @ts-expect-error - TODO
 export const fieldConfig: FieldConfig = buildZodFieldConfig<
@@ -48,12 +49,14 @@ export function removeEmptyValues<T extends Record<string, any>>(values: T): Par
 }
 
 /**
- * Resolve serialized zod output - This function takes the string output of the `jsonSchemaToZod` function
- * and instantiates the zod object correctly.
- *
- * @param obj - serialized zod object
+ * Convert a JSON Schema or serialized Zod schema to a ZodType object.
+ * 
+ * This function safely converts schemas without using `Function()` (which violates CSP).
+ * 
+ * @param obj - JSON Schema object or serialized Zod schema string
  * @returns resolved zod object
+ * @see https://github.com/mastra-ai/mastra/issues/16992
  */
-export function resolveSerializedZodOutput(obj: any) {
-  return Function('z', `"use strict";return (${obj});`)(z);
+export function resolveSerializedZodOutput(obj: any): z.ZodType {
+  return convertSchemaToZod(obj);
 }

@@ -1,4 +1,5 @@
 import { jsonSchemaToZod } from '@mastra/schema-compat/json-to-zod';
+import { convertSchemaToZod } from '@mastra/schema-compat/utils';
 import type { JSONSchema7 } from 'json-schema';
 import type { ZodSchema, ZodError, ZodIssue } from 'zod/v4';
 import { z } from 'zod/v4';
@@ -6,11 +7,14 @@ import { SchemaValidationError } from './errors';
 import type { FieldError, BatchValidationResult } from './errors';
 
 /**
- * Convert JSON Schema string to runtime Zod schema.
- * Uses Function() to evaluate the generated Zod code - same pattern as workflow validation.
+ * Convert JSON Schema to runtime Zod schema.
+ * 
+ * Uses convertSchemaToZod() which safely converts without Function().
+ * @see https://github.com/mastra-ai/mastra/issues/16992
  */
 function resolveZodSchema(zodString: string): ZodSchema {
-  return Function('z', `"use strict";return (${zodString});`)(z);
+  // jsonSchemaToZod() returns a string, convertSchemaToZod() converts it to ZodType
+  return convertSchemaToZod(zodString);
 }
 
 /** Schema validator with compilation caching */

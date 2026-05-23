@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { CoreMessage } from '@internal/ai-sdk-v4';
 import { jsonSchemaToZod } from '@mastra/schema-compat/json-to-zod';
+import { convertSchemaToZod } from '@mastra/schema-compat/utils';
 import { z } from 'zod/v4';
 import type { MastraPrimitives } from './action';
 import type { ToolsInput } from './agent';
@@ -463,7 +464,7 @@ function convertVercelToolParameters(tool: VercelTool): z.ZodType {
     schema = schema();
   }
 
-  return isZodType(schema) ? schema : resolveSerializedZodOutput(jsonSchemaToZod(schema));
+  return isZodType(schema) ? schema : convertSchemaToZod(schema);
 }
 
 /**
