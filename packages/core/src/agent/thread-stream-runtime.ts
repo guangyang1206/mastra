@@ -575,7 +575,11 @@ export class AgentThreadStreamRuntime {
       const runId = state.activeThreadRunIds.get(key);
       if (!runId) return null;
       const record = state.threadRunsById.get(runId);
-      if (!record) return state.threadKeysByRunId.get(runId) === key ? null : runId;
+      // During the gap between sendSignal (sets activeThreadRunIds + threadKeysByRunId)
+      // and registerRun (populates threadRunsById), treat the run as active so
+      // waitForCurrentThreadStreamIdle() does not exit early and fire a phantom
+      // agent_end before chunks reach processSubscribedThreadStream.
+      if (!record) return state.threadKeysByRunId.get(runId) === key ? runId : null;
       return record.output.status === 'running' ? runId : null;
     };
 
