@@ -121,6 +121,58 @@ When the agent calls this tool, users see a card with the tool name, arguments, 
 
 Set `toolDisplay: 'text'` on an adapter to render tool calls as plain text instead of interactive cards. In `'hidden'` mode the agent uses `autoResumeSuspendedTools` to let the LLM decide based on the conversation context, since hidden mode does not post approval buttons.
 
+## Custom handler context (`ctx`)
+
+Added in: `@mastra/core@1.23.0`
+
+Custom channel handlers (`onDirectMessage`, `onMention`, `onSubscribedMessage`) receive a 4th `ctx` argument that gives you first-class access to the active agent run on the current thread.
+
+The `ctx` object exposes:
+
+- `threadId` / `resourceId` — the Mastra thread + resource ids resolved for this chat thread (memory & history scope)
+- `abortSignal: AbortSignal` — fires when the active run on this thread is aborted from anywhere (this handler, another handler on the same thread, `agent.abortRunStream()`, or `channels.close()`)
+- `abort(reason?): boolean` — abort the currently active run on this thread; returns `true` if a run was aborted
+- `activeRunId(): string | undefined` — the active runId on this thread, or `undefined` if idle
+
+### Stop handler example
+
+This unblocks the user request in #17065 — a `'stop'` command handler is now this short:
+
+```typescript
+channels: {
+  handlers: {
+    onDirectMessage: async (thread, message, defaultHandler, ctx) => {
+      if (message.text.trim().toLowerCase() === 'stop') {
+        if (ctx.abort()) await thread.post('⏹️ stopped')
+        return
+      }
+      await defaultHandler(thread, message)
+    },
+  },
+}
+```
+
+### AbortSignal for async work
+
+`ctx` is also a natural place to pass `abortSignal` into any async work a handler kicks off (`fetch`, model calls, etc.) so the work stops cleanly when the run is canceled:
+
+```typescript
+channels: {
+  handlers: {
+    onDirectMessage: async (thread, message, defaultHandler, ctx) => {
+      const response = await fetch('https://api.example.com/data', {
+        signal: ctx.abortSignal
+      })
+      // ...
+    },
+  },
+}
+```
+
+### Backward compatibility
+
+The 4th `ctx` arg is optional from the caller's TypeScript perspective. Existing 3-arg handlers (`(thread, message, defaultHandler) => …`) compile and run unchanged.
+
 ## Multi-user awareness
 
 In group conversations, Mastra automatically prefixes each message with the sender's name and platform ID so the agent can distinguish between speakers:
