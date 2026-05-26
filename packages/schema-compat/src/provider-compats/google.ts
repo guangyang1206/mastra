@@ -221,6 +221,46 @@ export class GoogleSchemaCompatLayer extends SchemaCompatLayer {
     if (isUnionSchema(schema)) {
       this.defaultUnionHandler(schema);
     }
+
+    // Google-specific fixes for Gemini REST API compatibility
+    // Gemini REST API doesn't support oneOf, $schema, propertyNames,
+    // sub-schema additionalProperties, or string const
+    if (schema) {
+      // Convert oneOf to anyOf (Gemini doesn't support oneOf)
+      if (Array.isArray(schema.oneOf)) {
+        schema.anyOf = schema.oneOf;
+        delete schema.oneOf;
+      }
+
+      // Remove $schema (not supported by Gemini)
+      if ('$schema' in schema) {
+        delete schema['$schema'];
+      }
+
+      // Remove propertyNames (not supported by Gemini)
+      if ('propertyNames' in schema) {
+        delete schema['propertyNames'];
+      }
+
+      // Remove sub-schema additionalProperties (Gemini expects boolean or absent)
+      if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+        // Convert object-form additionalProperties to boolean
+        // If the sub-schema has properties, set additionalProperties: true
+        // Otherwise, set additionalProperties: false
+        const subSchema = schema.additionalProperties as Record<string, any>;
+        if (subSchema.properties && Object.keys(subSchema.properties).length > 0) {
+          schema.additionalProperties = true;
+        } else {
+          schema.additionalProperties = false;
+        }
+      }
+
+      // Convert string const to enum: [const] (Gemini doesn't support const)
+      if (schema.const && typeof schema.const === 'string') {
+        schema.enum = [schema.const];
+        delete schema.const;
+      }
+    }
   }
 
   #traverse(value: unknown, schema: Record<string, unknown>): unknown {
