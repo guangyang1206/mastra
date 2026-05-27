@@ -221,6 +221,37 @@ export class GoogleSchemaCompatLayer extends SchemaCompatLayer {
     if (isUnionSchema(schema)) {
       this.defaultUnionHandler(schema);
     }
+
+    const anySchema = schema as any;
+
+    // #17057: Google GenAI REST API expects OpenAPI 3.0 `anyOf`,
+    // not JSON Schema `oneOf`. Convert so Gemini tool-calls work.
+    if (Array.isArray(anySchema.oneOf)) {
+      anySchema.anyOf = anySchema.oneOf;
+      delete anySchema.oneOf;
+    }
+
+    // #17057: `z.lazy()` emits `$ref` + `definitions` which
+    // the Gemini REST API cannot follow. Dereference by inlining.
+    if (anySchema.$ref && anySchema.definitions) {
+      const key = anySchema.$ref.replace(/^#\/definitions\//, '');
+      const def = anySchema.definitions?.[key];
+      if (def && typeof def === 'object') {
+        for (const [k, v] of Object.entries(def as object)) {
+          if (k !== '$schema' && k !== 'definitions') {
+            (schema as any)[k] = v;
+          }
+        }
+        delete anySchema.$ref;
+        delete anySchema.definitions;
+      }
+    }
+
+    // #17057: `z.tuple([...])` emits `items: [...]` (JSON Schema Draft-04
+    // array form). Gemini REST API expects `items: { anyOf: [...] }`.
+    if (Array.isArray(anySchema.items)) {
+      anySchema.items = { anyOf: anySchema.items };
+    }
   }
 
   #traverse(value: unknown, schema: Record<string, unknown>): unknown {
