@@ -28,6 +28,15 @@ type LegacyToolInvocation = NonNullable<UIMessageV4['toolInvocations']>[number];
 export type MastraProviderMetadata = AIV5Type.ProviderMetadata;
 type MastraPartExtensions = { providerMetadata?: MastraProviderMetadata; createdAt?: number };
 type PartWithProviderMetadata<T> = T & MastraPartExtensions;
+
+// Pre-computed part types to avoid excessive type instantiation depth
+// when MastraMessagePart is used inside deeply-nested generic contexts (e.g. @hono/zod-openapi route handlers).
+// See https://github.com/mastra-ai/mastra/issues/17047
+type MastraMessagePartBase = PartWithProviderMetadata<
+  Exclude<UIMessageV4['parts'][number], { type: 'tool-invocation' | 'source' | 'step-start' }>
+>;
+type MastraMessagePartDataUI = PartWithProviderMetadata<AIV5Type.DataUIPart<AIV5.UIDataTypes>>;
+
 export type MastraStepStartPart = {
   type: 'step-start';
   model?: string;
@@ -77,14 +86,12 @@ export type MastraSourceUrlPart = Omit<LegacySourcePart, 'providerMetadata'> & {
 // it with provider metadata, AI SDK v5 data parts, and v6-only persisted parts
 // such as approval-aware tool invocations and source documents.
 export type MastraMessagePart =
-  | PartWithProviderMetadata<
-      Exclude<UIMessageV4['parts'][number], { type: 'tool-invocation' | 'source' | 'step-start' }>
-    >
+  | MastraMessagePartBase
   | MastraStepStartPart
   | MastraToolInvocationPart
   | MastraSourceUrlPart
   | MastraSourceDocumentPart
-  | PartWithProviderMetadata<AIV5Type.DataUIPart<AIV5.UIDataTypes>>;
+  | MastraMessagePartDataUI;
 
 // V4-compatible part type (excludes DataUIPart which V4 doesn't support)
 export type UIMessageV4Part = UIMessageV4['parts'][number] & MastraPartExtensions;
