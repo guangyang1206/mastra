@@ -5276,6 +5276,38 @@ export class Agent<
       }
     }
 
+    // Gemini (via direct Google AI or OpenRouter) rejects function declarations
+    // whose `parameters.required` references a property NOT in `parameters.properties`.
+    // This can happen when Zod's .pick()/.omit() produces a JSON Schema where
+    // `required` is not updated to match the trimmed `properties`.
+    // Remove any `required` entries that don't correspond to an actual property
+    // (see #13988, #17325).
+    const cleanSchema = (schema: any): any => {
+      if (!schema || typeof schema !== 'object') return schema;
+      const cleaned: any = { ...schema };
+      if (cleaned.properties && Array.isArray(cleaned.required)) {
+        const validKeys = new Set(Object.keys(cleaned.properties));
+        cleaned.required = cleaned.required.filter((k: string) => validKeys.has(k));
+        if (cleaned.required.length === 0) delete cleaned.required;
+      }
+      // Recurse into nested objects / arrays
+      if (cleaned.properties && typeof cleaned.properties === 'object') {
+        for (const [k, v] of Object.entries(cleaned.properties)) {
+          cleaned.properties[k] = cleanSchema(v);
+        }
+      }
+      if (cleaned.items && typeof cleaned.items === 'object') {
+        cleaned.items = cleanSchema(cleaned.items);
+      }
+      return cleaned;
+    };
+
+    for (const [toolName, tool] of Object.entries(tools)) {
+      if (tool?.execute?.toolSchema && typeof tool.execute.toolSchema === 'object') {
+        (tool as any).execute.toolSchema = cleanSchema((tool as any).execute.toolSchema);
+      }
+    }
+
     return tools;
   }
 
