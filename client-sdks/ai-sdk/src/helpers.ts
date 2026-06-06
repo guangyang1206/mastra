@@ -338,7 +338,7 @@ export function convertMastraChunkToAISDKBase<OUTPUT = undefined>({
         output: hasTransformedToolPayload(displayOutputTransform)
           ? displayOutputTransform.transformed
           : chunk.payload.result,
-        // providerMetadata: chunk.payload.providerMetadata, // AI v5 types don't show this?
+        providerMetadata: chunk.payload.providerMetadata,
       };
     case 'tool-error':
       return {
@@ -352,7 +352,7 @@ export function convertMastraChunkToAISDKBase<OUTPUT = undefined>({
         toolCallId: chunk.payload.toolCallId,
         providerExecuted: chunk.payload.providerExecuted,
         toolName: chunk.payload.toolName,
-        // providerMetadata: chunk.payload.providerMetadata, // AI v5 types don't show this?
+        providerMetadata: chunk.payload.providerMetadata,
       };
 
     case 'abort':
